@@ -7,6 +7,7 @@
 template<class T>
 struct ConcurrentQueue {
     std::queue<T> q_;
+    bool aborted_ = false;
     std::mutex mtx_;
     std::condition_variable cv_;
 
@@ -28,8 +29,15 @@ struct ConcurrentQueue {
 
     void pop(T& t) {
         std::unique_lock<std::mutex> lock(mtx_);
-        while (q_.empty()) cv_.wait(lock);
+        while (q_.empty() && !aborted_) cv_.wait(lock);
+        if (aborted_) throw "aborted";
         t = std::move(q_.front());
         q_.pop();
+    }
+
+    void abort() {
+        std::lock_guard<std::mutex> lock(mtx_);
+        aborted_ = true;
+        cv_.notify_all();
     }
 };
