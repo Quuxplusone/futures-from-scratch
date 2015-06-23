@@ -97,9 +97,33 @@ void test_preset_promise()
     assert(v == 42);
 }
 
+struct ThrowingWidget {
+    bool b_;
+    ThrowingWidget() : b_(false) {}
+    ThrowingWidget(bool b) : b_(b) {}
+    ThrowingWidget(ThrowingWidget&&) = default;
+    ThrowingWidget& operator=(ThrowingWidget&& rhs) {
+        if (rhs.b_) throw "throwing_widget";
+        return *this;
+    }
+};
+
+void test_throw_in_set_value()
+{
+    Promise<ThrowingWidget> p;
+    try {
+        p.set_value(ThrowingWidget(true));
+        assert(false);
+    } catch (const char *s) {
+        assert(strcmp(s, "throwing_widget") == 0);
+    }
+    p.set_value(ThrowingWidget(false));
+}
+
 int main()
 {
     test_simple_cases();
     test_breaking_promises();
     test_preset_promise();
+    test_throw_in_set_value();
 }

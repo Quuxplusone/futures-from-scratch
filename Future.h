@@ -46,31 +46,28 @@ struct Promise {
 
     void set_value(R r) {
         if (state_ == nullptr) throw "no_state";
-        std::lock_guard<std::mutex> lock(state_->mtx_);
         if (state_->ready_) throw "promise_already_satisfied";
         state_->value_ = std::move(r);
-        state_->ready_ = true;
-        state_->cv_.notify_all();
+        set_ready();
     }
 
     void set_exception(std::exception_ptr p) {
         if (state_ == nullptr) throw "no_state";
-        std::lock_guard<std::mutex> lock(state_->mtx_);
         if (state_->ready_) throw "promise_already_satisfied";
         state_->exception_ = std::move(p);
+        set_ready();
+    }
+
+  private:
+    void set_ready() {
+        std::lock_guard<std::mutex> lock(state_->mtx_);
         state_->ready_ = true;
         state_->cv_.notify_all();
     }
 
-  private:
     void abandon_state() {
-        if (state_ != nullptr) {
-            std::lock_guard<std::mutex> lock(state_->mtx_);
-            if (!state_->ready_) {
-                state_->exception_ = std::make_exception_ptr("broken_promise");
-                state_->ready_ = true;
-                state_->cv_.notify_all();
-            }
+        if (state_ != nullptr && !state_->ready_) {
+            set_exception(std::make_exception_ptr("broken_promise"));
         }
     }
 };
