@@ -74,12 +74,10 @@ struct Promise {
 };
 
 template<class R>
-struct Future {
-
-    std::shared_ptr<SharedState<R>> state_;
+struct Future : private SharedFuture<R> {
 
     Future() {}
-    Future(std::shared_ptr<SharedState<R>> s) : state_(s) {}
+    Future(std::shared_ptr<SharedState<R>> s) : SharedFuture<R>(s) {}
 
     Future(const Future&) = delete;
     Future& operator=(const Future&) = delete;
@@ -88,34 +86,20 @@ struct Future {
 
     R get() {
         wait();
-        auto sp = std::move(state_);
+        auto sp = std::move(this->state_);
         if (sp->exception_) {
             std::rethrow_exception(sp->exception_);
         }
         return std::move(sp->value_);
     }
 
-    bool valid() const {
-        return (state_ != nullptr);
-    }
-
-    bool ready() const {
-        if (state_ == nullptr) return false;
-        std::unique_lock<std::mutex> lock(state_->mtx_);
-        return state_->ready_;
-    }
-
-    void wait() const {
-        if (state_ == nullptr) throw "no_state";
-        std::unique_lock<std::mutex> lock(state_->mtx_);
-        while (!state_->ready_) {
-            state_->cv_.wait(lock);
-        }
-    }
+    using SharedFuture<R>::valid;
+    using SharedFuture<R>::ready;
+    using SharedFuture<R>::wait;
 
     SharedFuture<R> share() const {
-        if (state_ == nullptr) throw "no_state";
-        return SharedFuture<R>(std::move(state_));
+        if (this->state_ == nullptr) throw "no_state";
+        return SharedFuture<R>(std::move(this->state_));
     }
 };
 
