@@ -1,13 +1,13 @@
 #pragma once
 
 #include "ConcurrentQueue.h"
+#include "UniqueFunction.h"
 #include <atomic>
-#include <functional>
 #include <thread>
 #include <utility>
 #include <vector>
 
-using Task = std::function<void()>;
+using Task = UniqueFunction<void()>;
 
 struct Scheduler {
     std::vector<ConcurrentQueue<Task>> queues_;
