@@ -7,6 +7,7 @@
 
 template<class R> struct Promise;
 template<class R> struct Future;
+template<class R> struct SharedFuture;
 
 template<class R>
 struct SharedState {
@@ -92,6 +93,46 @@ struct Future {
             std::rethrow_exception(sp->exception_);
         }
         return std::move(sp->value_);
+    }
+
+    bool valid() const {
+        return (state_ != nullptr);
+    }
+
+    bool ready() const {
+        if (state_ == nullptr) return false;
+        std::unique_lock<std::mutex> lock(state_->mtx_);
+        return state_->ready_;
+    }
+
+    void wait() const {
+        if (state_ == nullptr) throw "no_state";
+        std::unique_lock<std::mutex> lock(state_->mtx_);
+        while (!state_->ready_) {
+            state_->cv_.wait(lock);
+        }
+    }
+
+    SharedFuture<R> share() const {
+        if (state_ == nullptr) throw "no_state";
+        return SharedFuture<R>(std::move(state_));
+    }
+};
+
+template<class R>
+struct SharedFuture {
+
+    std::shared_ptr<SharedState<R>> state_;
+
+    SharedFuture() {}
+    SharedFuture(std::shared_ptr<SharedState<R>> s) : state_(s) {}
+
+    R& get() const {
+        wait();
+        if (state_->exception_) {
+            std::rethrow_exception(state_->exception_);
+        }
+        return state_->value_;
     }
 
     bool valid() const {
