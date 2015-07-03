@@ -6,11 +6,11 @@
 template<typename Signature>
 class UniqueFunction;
 
-template<>
-class UniqueFunction<void()> {
+template<typename... A>
+class UniqueFunction<void(A...)> {
 
     struct ContainerBase {
-        virtual void call() = 0;
+        virtual void call(A...) = 0;
         virtual ~ContainerBase() {}
     };
 
@@ -18,7 +18,7 @@ class UniqueFunction<void()> {
     struct Container : ContainerBase {
         F f_;
         Container(F f) : f_(std::move(f)) {}
-        virtual void call() { f_(); }
+        virtual void call(A... args) { f_(std::move(args)...); }
     };
 
     std::unique_ptr<ContainerBase> ctr_;
@@ -28,7 +28,7 @@ class UniqueFunction<void()> {
 
     template<class F> UniqueFunction(F f) : ctr_(new Container<F>(std::move(f))) {}
 
-    void operator()() const { return ctr_->call(); }
+    void operator()(A... args) const { return ctr_->call(std::move(args)...); }
 
     operator bool() const { return ctr_ != nullptr; }
 };
