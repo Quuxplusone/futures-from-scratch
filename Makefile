@@ -5,6 +5,7 @@ TESTS = \
   TestAsync \
   TestConcurrentQueue \
   TestFuture \
+  TestPackagedTask \
   TestScheduler
 
 all: $(TESTS)
