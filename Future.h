@@ -1,13 +1,18 @@
 #pragma once
 
-#include <exception>
-#include <memory>
-#include <mutex>
-#include <utility>
-
 template<class R> struct Promise;
 template<class R> struct Future;
 template<class R> struct SharedFuture;
+
+#include "PackagedTask.h"
+#include "SystemScheduler.h"
+#include "UniqueFunction.h"
+
+#include <exception>
+#include <list>
+#include <memory>
+#include <mutex>
+#include <utility>
 
 template<class R>
 struct SharedState {
@@ -16,6 +21,7 @@ struct SharedState {
     bool ready_ = false;
     std::mutex mtx_;
     std::condition_variable cv_;
+    std::list<UniqueFunction<void()>> continuations_;
 };
 
 template<class R>
@@ -63,6 +69,10 @@ struct Promise {
     void set_ready() {
         std::lock_guard<std::mutex> lock(state_->mtx_);
         state_->ready_ = true;
+        for (auto& task : state_->continuations_) {
+            SystemScheduler().schedule(std::move(task));
+        }
+        state_->continuations_.clear();
         state_->cv_.notify_all();
     }
 
@@ -101,6 +111,25 @@ struct Future : private SharedFuture<R> {
         if (this->state_ == nullptr) throw "no_state";
         return SharedFuture<R>(std::move(this->state_));
     }
+
+    template<class F>
+    auto then(F func)
+    {
+        if (this->state_ == nullptr) throw "no_state";
+        auto sp = this->state_;
+        using R2 = decltype(func(std::move(*this)));
+        PackagedTask<R2()> task([func = std::move(func), fut = std::move(*this)]() mutable {
+            return func(std::move(fut));
+        });
+        Future<R2> result = task.get_future();
+        std::lock_guard<std::mutex> lock(sp->mtx_);
+        if (sp->ready_) {
+            SystemScheduler().schedule(std::move(task));
+        } else {
+            sp->continuations_.emplace_back(std::move(task));
+        }
+        return result;
+    }
 };
 
 template<class R>
@@ -135,5 +164,24 @@ struct SharedFuture {
         while (!state_->ready_) {
             state_->cv_.wait(lock);
         }
+    }
+
+    template<class F>
+    auto then(F func)
+    {
+        if (this->state_ == nullptr) throw "no_state";
+        auto sp = this->state_;
+        using R2 = decltype(func(*this));
+        PackagedTask<R2()> task([func = std::move(func), fut = *this]() mutable {
+            return func(std::move(fut));
+        });
+        Future<R2> result = task.get_future();
+        std::lock_guard<std::mutex> lock(sp->mtx_);
+        if (sp->ready_) {
+            SystemScheduler().schedule(std::move(task));
+        } else {
+            sp->continuations_.emplace_back(std::move(task));
+        }
+        return result;
     }
 };

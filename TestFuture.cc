@@ -1,4 +1,5 @@
 
+#include "Async.h"
 #include "Future.h"
 
 #include <assert.h>
@@ -120,10 +121,97 @@ void test_throw_in_set_value()
     p.set_value(ThrowingWidget(false));
 }
 
+void test_then()
+{
+    if (true) {
+        Promise<int> p;
+        p.set_value(42);
+        Future<int> f = p.get_future();
+        Future<int> f2 = f.then([](Future<int> f){
+            assert(f.ready());
+            return f.get() + 1;
+        });
+        assert(!f.valid());
+        assert(f2.get() == 43);
+    }
+    if (true) {
+        Promise<int> p;
+        Future<int> f = p.get_future();
+        p.set_value(42);
+        Future<int> f2 = f.then([](Future<int> f){
+            assert(f.ready());
+            return f.get() + 1;
+        });
+        assert(!f.valid());
+        assert(f2.get() == 43);
+    }
+    if (true) {
+        Promise<int> p;
+        Future<int> f = p.get_future();
+        Future<int> f2 = f.then([](Future<int> f){
+            assert(f.ready());
+            return f.get() + 1;
+        });
+        assert(!f.valid());
+        assert(!f2.ready());
+        auto g = +[](Future<int> f) {
+            return f.get() + 100;
+        };
+        f2 = f2.then(g);
+        p.set_value(0);
+        assert(f2.get() == 101);
+    }
+}
+
+void test_canceling_then()
+{
+    if (true) {
+        Future<int> f = Async([]() { sleep(1); puts("done A"); return 0; });
+        puts("scheduled A");
+        f = f.then([](auto&&) { sleep(1); puts("done B"); return 0; });
+        puts("scheduled B");
+        f = f.then([](auto&&) { sleep(1); puts("done C"); return 0; });
+        puts("scheduled C");
+        f.wait();
+    }
+    if (true) {
+        Future<int> f = Async([]() { sleep(1); puts("done A"); return 0; });
+        puts("scheduled A");
+        f = f.then([](auto&&) { sleep(1); puts("done B"); return 0; });
+        puts("scheduled B");
+        f = f.then([](auto&&) { sleep(2); puts("done C"); return 0; });
+        puts("scheduled C");
+        f = Async([]() { sleep(3); puts("done A2"); return 0; });
+        puts("scheduled A2; no longer care about the result of C");
+        f.wait();
+        puts("done waiting");
+        sleep(2);
+        puts("done sleeping");
+    }
+}
+
+void test_multiple_thens()
+{
+    Future<int> f = Async([]() { sleep(1); puts("done A"); return 1; });
+    SharedFuture<int> sf = f.share();
+    Future<int> fa = sf.then([](SharedFuture<int> sf) { assert(sf.ready()); puts("done FA"); return sf.get() + 1; });
+    Future<int> fb = sf.then([](SharedFuture<int> sf) { assert(sf.ready()); sleep(1); puts("done FB"); return sf.get() + 2; });
+
+    assert(fa.get() == 2);
+    assert(sf.ready() && sf.get() == 1);
+    assert(sf.ready() && sf.get() == 1);
+    assert(!fb.ready());
+    assert(fb.get() == 3);
+    assert(sf.ready() && sf.get() == 1);
+}
+
 int main()
 {
     test_simple_cases();
     test_breaking_promises();
     test_preset_promise();
     test_throw_in_set_value();
+    test_then();
+    test_canceling_then();
+    test_multiple_thens();
 }
