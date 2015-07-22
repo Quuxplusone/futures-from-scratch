@@ -6,11 +6,19 @@
 
 #include <utility>
 
-template<typename Func, typename R = decltype(std::declval<Func>()())>
-Future<R> Async(Func f)
+template<typename Func, typename... Args>
+auto Async(Func func, Args... args)
+     -> Future<decltype(func(std::move(args)...))>
 {
-    PackagedTask<R()> task(std::move(f));
+    using R = decltype(func(std::move(args)...));
+    PackagedTask<R(Args...)> task(std::move(func));
     Future<R> result = task.get_future();
-    SystemScheduler().schedule(std::move(task));
+
+    auto wrapper = [](PackagedTask<R(Args...)>& task, Args&... args) {
+        task(std::move(args)...);
+    };
+
+    auto bound = std::bind(wrapper, std::move(task), std::move(args)...);
+    SystemScheduler().schedule(std::move(bound));
     return result;
 }
