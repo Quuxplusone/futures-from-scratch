@@ -65,6 +65,11 @@ struct Promise {
         set_ready();
     }
 
+    bool has_extant_future() const {
+        if (state_ == nullptr) return false;
+        return future_already_retrieved_ && !state_.unique();
+    }
+
   private:
     void set_ready() {
         std::lock_guard<std::mutex> lock(state_->mtx_);

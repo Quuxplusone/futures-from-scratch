@@ -226,7 +226,7 @@ void test_canceling_then()
         puts("scheduled A");
         f = f.then([](auto&&) { sleep(1); puts("done B"); return 0; });
         puts("scheduled B");
-        f = f.then([](auto&&) { sleep(2); puts("done C"); return 0; });
+        f = f.then([](auto&&) { assert(false); return 0; });
         puts("scheduled C");
         f = Async([]() { sleep(3); puts("done A2"); return 0; });
         puts("scheduled A2; no longer care about the result of C");

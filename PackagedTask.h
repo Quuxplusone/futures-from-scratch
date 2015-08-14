@@ -20,6 +20,7 @@ struct PackagedTask<R(A...)> {
         Promise<R> p;
         future_ = p.get_future();
         task_ = [p = std::move(p), f = std::forward<F>(f)](A... args) mutable {
+            if (!p.has_extant_future()) return;
             try {
                 p.set_value(f(std::forward<A>(args)...));
             } catch (...) {
