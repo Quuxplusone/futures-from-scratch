@@ -19,12 +19,22 @@ struct PackagedTask<R(A...)> {
     PackagedTask(F&& f) {
         Promise<R> p;
         future_ = p.get_future();
-        task_ = [p = std::move(p), f = std::forward<F>(f)](A... args) mutable {
-            if (!p.has_extant_future()) return;
-            try {
-                p.set_value(f(std::forward<A>(args)...));
-            } catch (...) {
-                p.set_exception(std::current_exception());
+
+        auto f_holder = [f = std::forward<F>(f)]() mutable { return std::move(f); };
+
+        auto sptr = std::make_shared<decltype(f_holder)>(std::move(f_holder));
+        std::weak_ptr<decltype(f_holder)> wptr = sptr;
+
+        future_.attach_cancellable_task_state(sptr);
+
+        task_ = [p = std::move(p), wptr = std::move(wptr)](A... args) mutable {
+            if (auto sptr = wptr.lock()) {
+                auto f = (*sptr)();
+                try {
+                    p.set_value(f(std::forward<A>(args)...));
+                } catch (...) {
+                    p.set_exception(std::current_exception());
+                }
             }
         };
     }

@@ -210,6 +210,12 @@ void test_next()
     }
 }
 
+struct LogOnDestruction {
+    const char *msg_;
+    LogOnDestruction(const char *m) : msg_(m) {}
+    ~LogOnDestruction() { printf("Destroyed LogOnDestruction(%s)\n", msg_); }
+};
+
 void test_canceling_then()
 {
     if (true) {
@@ -224,9 +230,9 @@ void test_canceling_then()
     if (true) {
         Future<int> f = Async([]() { sleep(1); puts("done A"); return 0; });
         puts("scheduled A");
-        f = f.then([](auto&&) { sleep(1); puts("done B"); return 0; });
+        f = f.then([b = std::make_shared<LogOnDestruction>("B")](auto&&) { assert(false); puts("done B"); return 0; });
         puts("scheduled B");
-        f = f.then([](auto&&) { assert(false); return 0; });
+        f = f.then([c = std::make_shared<LogOnDestruction>("C")](auto&&) { assert(false); return 0; });
         puts("scheduled C");
         f = Async([]() { sleep(3); puts("done A2"); return 0; });
         puts("scheduled A2; no longer care about the result of C");

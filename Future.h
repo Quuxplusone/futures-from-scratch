@@ -111,6 +111,7 @@ struct Future : private SharedFuture<R> {
     using SharedFuture<R>::valid;
     using SharedFuture<R>::ready;
     using SharedFuture<R>::wait;
+    using SharedFuture<R>::attach_cancellable_task_state;
 
     SharedFuture<R> share() const {
         if (this->state_ == nullptr) throw "no_state";
@@ -174,6 +175,7 @@ template<class R>
 struct SharedFuture {
 
     std::shared_ptr<SharedState<R>> state_;
+    std::shared_ptr<void> cancellable_task_state_;
 
     SharedFuture() {}
     SharedFuture(std::shared_ptr<SharedState<R>> s) : state_(s) {}
@@ -202,6 +204,10 @@ struct SharedFuture {
         while (!state_->ready_) {
             state_->cv_.wait(lock);
         }
+    }
+
+    void attach_cancellable_task_state(std::shared_ptr<void> sptr) {
+        cancellable_task_state_ = std::move(sptr);
     }
 
     template<class F>
