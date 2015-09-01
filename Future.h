@@ -130,6 +130,39 @@ struct Future : private SharedFuture<R> {
         }
         return result;
     }
+
+    template<class F>
+    auto next(F func)
+    {
+        return this->then(
+            [func = std::move(func)](Future<R> x) {
+                return func(x.get());
+            }
+        );
+    }
+
+    template<class F>
+    Future<R> recover(F func)
+    {
+        return this->then(
+            [func = std::move(func)](Future<R> x) {
+                try {
+                    return x.get();
+                } catch (...) {
+                    return func(std::current_exception());
+                }
+            }
+        );
+    }
+
+    Future<R> fallback_to(R fallback)
+    {
+        return this->recover(
+            [fallback = std::move(fallback)](std::exception_ptr) {
+                return fallback;
+            }
+        );
+    }
 };
 
 template<class R>
@@ -183,5 +216,38 @@ struct SharedFuture {
             sp->continuations_.emplace_back(std::move(task));
         }
         return result;
+    }
+
+    template<class F>
+    auto next(F func)
+    {
+        return this->then(
+            [func = std::move(func)](Future<R> x) {
+                return func(x.get());
+            }
+        );
+    }
+
+    template<class F>
+    auto recover(F func)
+    {
+        return this->then(
+            [func = std::move(func)](Future<R> x) {
+                try {
+                    return x.get();
+                } catch (...) {
+                    return func(std::current_exception());
+                }
+            }
+        );
+    }
+
+    Future<R> fallback_to(R fallback)
+    {
+        return this->recover(
+            [fallback = std::move(fallback)](std::exception_ptr) {
+                return fallback;
+            }
+        );
     }
 };

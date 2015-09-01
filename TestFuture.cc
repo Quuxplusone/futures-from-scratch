@@ -163,6 +163,53 @@ void test_then()
     }
 }
 
+void test_next()
+{
+    if (true) {
+        Promise<int> p;
+        p.set_value(42);
+        Future<int> f = p.get_future();
+        Future<int> f2 = f.next([](int f){ return f+1; });
+        assert(!f.valid());
+        assert(f2.get() == 43);
+    }
+    if (true) {
+        Promise<int> p;
+        Future<int> f = p.get_future();
+        p.set_value(42);
+        Future<int> f2 = f.next([](int f){ return f+1; });
+        assert(!f.valid());
+        assert(f2.get() == 43);
+    }
+    if (true) {
+        Promise<int> p;
+        Future<int> f = p.get_future();
+        Future<int> f2 = f.next([](int f){ return f+1; });
+        assert(!f.valid());
+        assert(!f2.ready());
+        auto g = +[](int f) { return f+100; };
+        f2 = f2.next(g);
+        p.set_value(0);
+        assert(f2.get() == 101);
+    }
+    if (true) {
+        auto inc = [](int f){ return f+1; };
+        Promise<int> p;
+        Future<int> f = p.get_future();
+        Future<int> f2 = f.next(inc).recover([](std::exception_ptr){ return 42; }).next(inc);
+        p.set_value(4);
+        assert(f2.get() == 6);
+    }
+    if (true) {
+        auto inc = [](int f){ return f+1; };
+        Promise<int> p;
+        Future<int> f = p.get_future();
+        Future<int> f2 = f.next(inc).recover([](std::exception_ptr){ return 42; }).next(inc);
+        p.set_exception(std::make_exception_ptr("throw me"));
+        assert(f2.get() == 43);
+    }
+}
+
 void test_canceling_then()
 {
     if (true) {
@@ -212,6 +259,7 @@ int main()
     test_preset_promise();
     test_throw_in_set_value();
     test_then();
+    test_next();
     test_canceling_then();
     test_multiple_thens();
 }
