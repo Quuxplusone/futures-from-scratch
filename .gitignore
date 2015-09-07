@@ -3,3 +3,4 @@ TestConcurrentQueue
 TestFuture
 TestPackagedTask
 TestScheduler
+TestWhen

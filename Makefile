@@ -6,7 +6,8 @@ TESTS = \
   TestConcurrentQueue \
   TestFuture \
   TestPackagedTask \
-  TestScheduler
+  TestScheduler \
+  TestWhen
 
 all: $(TESTS)
 
